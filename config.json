@@ -4,12 +4,12 @@
   "randomAmountRanges": {
     "ZIG_ORO": {
       "ZIG": {
-        "min": 0.01,
-        "max": 0.02
+        "min": 1,
+        "max": 2
       },
       "ORO": {
-        "min": 0.001,
-        "max": 0.004
+        "min": 0.1,
+        "max": 0.4
       }
     },
     "ZIG_BEE": {
