@@ -72,7 +72,7 @@ function loadConfig() {
       const data = fs.readFileSync(CONFIG_FILE, "utf8");
       const config = JSON.parse(data);
       dailyActivityConfig.swapRepetitions = Number(config.swapRepetitions) || 1;
-      dailyActivityConfig.addLpRepetitions = Number(config.addLpRepetitions) || 1; // Load addLpRepetitions
+      dailyActivityConfig.addLpRepetitions = Number(config.addLpRepetitions) || 1; 
       dailyActivityConfig.randomAmountRanges = config.randomAmountRanges || dailyActivityConfig.randomAmountRanges;
       dailyActivityConfig.addLpOroRange = config.addLpOroRange || { min: 0.5, max: 1.0 };
     } else {
@@ -822,7 +822,7 @@ manualConfigSubMenu.on("select", (item) => {
       break;
     case "Set Random Amount ZIG & ORO":
       promptBox.setFront();
-      promptBox.input(`Masukkan rentang random amount untuk ZIG pada pasangan ZIG & ORO (format: min,max, contoh: 0.001,0.002): `, "", (err, valueZig) => {
+      promptBox.input(`Masukkan rentang random amount untuk ZIG pada pasangan ZIG & ORO (format: min,max, contoh: 0.01,0.02): `, "", (err, valueZig) => {
         promptBox.hide();
         safeRender();
         if (err || !valueZig) {
@@ -834,7 +834,7 @@ manualConfigSubMenu.on("select", (item) => {
         }
         const [minZig, maxZig] = valueZig.split(",").map(v => parseFloat(v.trim()));
         if (isNaN(minZig) || isNaN(maxZig) || minZig <= 0 || maxZig <= minZig) {
-          addLog(`Set Random Amount: Input tidak valid untuk ZIG pada ZIG & ORO. Gunakan format min,max (contoh: 0.001,0.002) dengan min > 0 dan max > min.`, "error");
+          addLog(`Set Random Amount: Input tidak valid untuk ZIG pada ZIG & ORO. Gunakan format min,max (contoh: 0.01,0.02) dengan min > 0 dan max > min.`, "error");
           manualConfigSubMenu.show();
           manualConfigSubMenu.focus();
           safeRender();
@@ -852,7 +852,7 @@ manualConfigSubMenu.on("select", (item) => {
             return;
           }
           const [minOro, maxOro] = valueOro.split(",").map(v => parseFloat(v.trim()));
-          if (isNaN(minOro) || isNaN(maxOro) || minOro <= 0 || maxOro <= minZig) {
+          if (isNaN(minOro) || isNaN(maxOro) || minOro <= 0 || maxOro <= minOro) {
             addLog(`Set Random Amount: Input tidak valid untuk ORO pada ZIG & ORO. Gunakan format min,max (contoh: 0.001,0.002) dengan min > 0 dan max > min.`, "error");
             manualConfigSubMenu.show();
             manualConfigSubMenu.focus();
@@ -874,7 +874,7 @@ manualConfigSubMenu.on("select", (item) => {
         promptBox.hide();
         safeRender();
         if (err || !valueZig) {
-          addLog(`Set Random Amount: Input untuk ZIG pada ZIG & BEE dibatalkan.`, "system");
+          addLog(`Set Random Amount: Input untuk ZIG pada Z neigh & BEE dibatalkan.`, "system");
           manualConfigSubMenu.show();
           manualConfigSubMenu.focus();
           safeRender();
@@ -900,7 +900,7 @@ manualConfigSubMenu.on("select", (item) => {
             return;
           }
           const [minBee, maxBee] = valueBee.split(",").map(v => parseFloat(v.trim()));
-          if (isNaN(minBee) || isNaN(maxBee) || minBee <= 0 || maxBee <= minZig) {
+          if (isNaN(minBee) || isNaN(maxBee) || minBee <= 0 || maxBee <= minBee) {
             addLog(`Set Random Amount: Input tidak valid untuk BEE pada ZIG & BEE. Gunakan format min,max (contoh: 0.001,0.003) dengan min > 0 dan max > min.`, "error");
             manualConfigSubMenu.show();
             manualConfigSubMenu.focus();
