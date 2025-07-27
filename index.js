@@ -72,7 +72,7 @@ function loadConfig() {
       const data = fs.readFileSync(CONFIG_FILE, "utf8");
       const config = JSON.parse(data);
       dailyActivityConfig.swapRepetitions = Number(config.swapRepetitions) || 1;
-      dailyActivityConfig.addLpRepetitions = Number(config.addLpRepetitions) || 1; 
+      dailyActivityConfig.addLpRepetitions = Number(config.addLpRepetitions) || 1; // Load addLpRepetitions
       dailyActivityConfig.randomAmountRanges = config.randomAmountRanges || dailyActivityConfig.randomAmountRanges;
       dailyActivityConfig.addLpOroRange = config.addLpOroRange || { min: 0.5, max: 1.0 };
     } else {
@@ -247,48 +247,38 @@ function toMicroUnits(amount, denom) {
 function calculateBeliefPrice(poolInfo, fromDenom, toDenom) {
   try {
     if (!poolInfo || !poolInfo.assets || poolInfo.assets.length !== 2) {
-      addLog(`Invalid pool info for ${fromDenom} ➯ ${toDenom}, using default belief price`, "wait");
-      if (toDenom === DENOM_BEE || fromDenom === DENOM_BEE) return "599.5204";
-      if (toDenom === DENOM_ORO) return "1.076507379458086167";
-      if (fromDenom === DENOM_ORO) return (1 / 1.076507379458086167).toFixed(18);
-      return "1.0";
+      addLog(`Invalid pool info for ${fromDenom} ➯ ${toDenom}, cannot calculate belief price`, "error");
+      throw new Error("Invalid pool info");
     }
 
     const asset1 = poolInfo.assets[0];
     const asset2 = poolInfo.assets[1];
-    const asset1Denom = asset1.info.native_token?.denom || asset1.info.token?.contract_addr;
-    const asset2Denom = asset2.info.native_token?.denom || asset2.info.token?.contract_addr;
+    const denom1 = asset1.info.native_token?.denom || asset1.info.token?.contract_addr;
+    const denom2 = asset2.info.native_token?.denom || asset2.info.token?.contract_addr;
 
-    let zigAmount, tokenAmount;
-    if (asset1Denom === DENOM_ZIG) {
-      zigAmount = parseFloat(asset1.amount) / 1_000_000;
-      tokenAmount = parseFloat(asset2.amount) / 1_000_000;
+    let amountFrom, amountTo;
+    if (fromDenom === denom1 && toDenom === denom2) {
+      amountFrom = parseFloat(asset1.amount);
+      amountTo = parseFloat(asset2.amount);
+    } else if (fromDenom === denom2 && toDenom === denom1) {
+      amountFrom = parseFloat(asset2.amount);
+      amountTo = parseFloat(asset1.amount);
     } else {
-      zigAmount = parseFloat(asset2.amount) / 1_000_000;
-      tokenAmount = parseFloat(asset1.amount) / 1_000_000;
+      addLog(`Pool does not match swap assets for ${fromDenom} ➯ ${toDenom}`, "error");
+      throw new Error("Mismatched pool assets");
     }
 
-    if (zigAmount <= 0 || tokenAmount <= 0) {
-      addLog(`Invalid pool amounts for ${fromDenom} ➯ ${toDenom}, using default belief price`, "wait");
-      if (toDenom === DENOM_BEE || fromDenom === DENOM_BEE) return "599.5204";
-      if (toDenom === DENOM_ORO) return "1.076507379458086167";
-      if (fromDenom === DENOM_ORO) return (1 / 1.076507379458086167).toFixed(18);
-      return "1.0";
+    if (amountFrom <= 0 || amountTo <= 0) {
+      addLog(`Invalid pool amounts for ${fromDenom} ➯ ${toDenom}`, "error");
+      throw new Error("Invalid pool amounts");
     }
 
-    let beliefPrice;
-    if (toDenom === DENOM_BEE || fromDenom === DENOM_BEE) {
-      beliefPrice = (zigAmount / tokenAmount).toFixed(18);
-    } else {
-      beliefPrice = (tokenAmount / zigAmount).toFixed(18);
-    }
+    const beliefPrice = (amountFrom / amountTo).toFixed(18);
+    addLog(`Calculated belief_price for ${fromDenom} ➯ ${toDenom}: ${beliefPrice}`, "debug");
     return beliefPrice;
   } catch (error) {
     addLog(`Failed to calculate belief price for ${fromDenom} ➯ ${toDenom}: ${error.message}`, "error");
-    if (toDenom === DENOM_BEE || fromDenom === DENOM_BEE) return "599.5204";
-    if (toDenom === DENOM_ORO) return "1.076507379458086167";
-    if (fromDenom === DENOM_ORO) return (1 / 1.076507379458086167).toFixed(18);
-    return "1.0";
+    throw error;
   }
 }
 
@@ -386,18 +376,18 @@ async function performSwap(client, address, fromDenom, toDenom, amount, swapNumb
     const msg = {
       swap: {
         belief_price: beliefPrice,
-        max_spread: "0.5",
+        max_spread: "0.005", // Diubah dari 0.5 ke 0.005
         offer_asset: { amount: microAmount.toString(), info: { native_token: { denom: fromDenom } } }
       }
     };
     const funds = coins(microAmount, fromDenom);
-    addLog(`Swap ${swapNumber} of ${totalSwaps}: ${amount} ${fromSymbol} ➯ ${toSymbol}`, "swap");
+    addLog(`Swap ${swapNumber} of ${totalSwaps}: ${amount} ${fromSymbol} ➯ ${toSymbol} (Contract: ${getShortAddress(contractAddress)}, Belief Price: ${beliefPrice})`, "swap");
     const result = await client.execute(address, contractAddress, msg, "auto", `Swap ${fromSymbol} to ${toSymbol}`, funds);
     const shortTxHash = getShortHash(result.transactionHash);
     addLog(`Swap ${swapNumber} completed! Tx: ${shortTxHash}`, "success");
     return result;
   } catch (error) {
-    addLog(`Swap ${swapNumber} failed: ${error.message}`, "error");
+    addLog(`Swap ${swapNumber} failed for ${fromDenom} ➯ ${toDenom}: ${error.message}`, "error");
     return null;
   }
 }
@@ -822,7 +812,7 @@ manualConfigSubMenu.on("select", (item) => {
       break;
     case "Set Random Amount ZIG & ORO":
       promptBox.setFront();
-      promptBox.input(`Masukkan rentang random amount untuk ZIG pada pasangan ZIG & ORO (format: min,max, contoh: 0.01,0.02): `, "", (err, valueZig) => {
+      promptBox.input(`Masukkan rentang random amount untuk ZIG pada pasangan ZIG & ORO (format: min,max, contoh: 0.001,0.002): `, "", (err, valueZig) => {
         promptBox.hide();
         safeRender();
         if (err || !valueZig) {
@@ -834,7 +824,7 @@ manualConfigSubMenu.on("select", (item) => {
         }
         const [minZig, maxZig] = valueZig.split(",").map(v => parseFloat(v.trim()));
         if (isNaN(minZig) || isNaN(maxZig) || minZig <= 0 || maxZig <= minZig) {
-          addLog(`Set Random Amount: Input tidak valid untuk ZIG pada ZIG & ORO. Gunakan format min,max (contoh: 0.01,0.02) dengan min > 0 dan max > min.`, "error");
+          addLog(`Set Random Amount: Input tidak valid untuk ZIG pada ZIG & ORO. Gunakan format min,max (contoh: 0.001,0.002) dengan min > 0 dan max > min.`, "error");
           manualConfigSubMenu.show();
           manualConfigSubMenu.focus();
           safeRender();
@@ -852,7 +842,7 @@ manualConfigSubMenu.on("select", (item) => {
             return;
           }
           const [minOro, maxOro] = valueOro.split(",").map(v => parseFloat(v.trim()));
-          if (isNaN(minOro) || isNaN(maxOro) || minOro <= 0 || maxOro <= minOro) {
+          if (isNaN(minOro) || isNaN(maxOro) || minOro <= 0 || maxOro <= minZig) {
             addLog(`Set Random Amount: Input tidak valid untuk ORO pada ZIG & ORO. Gunakan format min,max (contoh: 0.001,0.002) dengan min > 0 dan max > min.`, "error");
             manualConfigSubMenu.show();
             manualConfigSubMenu.focus();
@@ -874,7 +864,7 @@ manualConfigSubMenu.on("select", (item) => {
         promptBox.hide();
         safeRender();
         if (err || !valueZig) {
-          addLog(`Set Random Amount: Input untuk ZIG pada Z neigh & BEE dibatalkan.`, "system");
+          addLog(`Set Random Amount: Input untuk ZIG pada ZIG & BEE dibatalkan.`, "system");
           manualConfigSubMenu.show();
           manualConfigSubMenu.focus();
           safeRender();
@@ -900,7 +890,7 @@ manualConfigSubMenu.on("select", (item) => {
             return;
           }
           const [minBee, maxBee] = valueBee.split(",").map(v => parseFloat(v.trim()));
-          if (isNaN(minBee) || isNaN(maxBee) || minBee <= 0 || maxBee <= minBee) {
+          if (isNaN(minBee) || isNaN(maxBee) || minBee <= 0 || maxBee <= minZig) {
             addLog(`Set Random Amount: Input tidak valid untuk BEE pada ZIG & BEE. Gunakan format min,max (contoh: 0.001,0.003) dengan min > 0 dan max > min.`, "error");
             manualConfigSubMenu.show();
             manualConfigSubMenu.focus();
