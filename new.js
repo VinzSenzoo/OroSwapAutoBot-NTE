@@ -248,48 +248,38 @@ function toMicroUnits(amount, denom) {
 function calculateBeliefPrice(poolInfo, fromDenom, toDenom) {
   try {
     if (!poolInfo || !poolInfo.assets || poolInfo.assets.length !== 2) {
-      addLog(`Invalid pool info for ${fromDenom} ➯ ${toDenom}, using default belief price`, "wait");
-      if (toDenom === DENOM_BEE || fromDenom === DENOM_BEE) return "599.5204";
-      if (toDenom === DENOM_ORO) return "1.076507379458086167";
-      if (fromDenom === DENOM_ORO) return (1 / 1.076507379458086167).toFixed(18);
-      return "1.0";
+      addLog(`Invalid pool info for ${fromDenom} ➯ ${toDenom}, cannot calculate belief price`, "error");
+      throw new Error("Invalid pool info");
     }
 
     const asset1 = poolInfo.assets[0];
     const asset2 = poolInfo.assets[1];
-    const asset1Denom = asset1.info.native_token?.denom || asset1.info.token?.contract_addr;
-    const asset2Denom = asset2.info.native_token?.denom || asset2.info.token?.contract_addr;
+    const denom1 = asset1.info.native_token?.denom || asset1.info.token?.contract_addr;
+    const denom2 = asset2.info.native_token?.denom || asset2.info.token?.contract_addr;
 
-    let zigAmount, tokenAmount;
-    if (asset1Denom === DENOM_ZIG) {
-      zigAmount = parseFloat(asset1.amount) / 1_000_000;
-      tokenAmount = parseFloat(asset2.amount) / 1_000_000;
+    let amountFrom, amountTo;
+    if (fromDenom === denom1 && toDenom === denom2) {
+      amountFrom = parseFloat(asset1.amount);
+      amountTo = parseFloat(asset2.amount);
+    } else if (fromDenom === denom2 && toDenom === denom1) {
+      amountFrom = parseFloat(asset2.amount);
+      amountTo = parseFloat(asset1.amount);
     } else {
-      zigAmount = parseFloat(asset2.amount) / 1_000_000;
-      tokenAmount = parseFloat(asset1.amount) / 1_000_000;
+      addLog(`Pool does not match swap assets for ${fromDenom} ➯ ${toDenom}`, "error");
+      throw new Error("Mismatched pool assets");
     }
 
-    if (zigAmount <= 0 || tokenAmount <= 0) {
-      addLog(`Invalid pool amounts for ${fromDenom} ➯ ${toDenom}, using default belief price`, "wait");
-      if (toDenom === DENOM_BEE || fromDenom === DENOM_BEE) return "599.5204";
-      if (toDenom === DENOM_ORO) return "1.076507379458086167";
-      if (fromDenom === DENOM_ORO) return (1 / 1.076507379458086167).toFixed(18);
-      return "1.0";
+    if (amountFrom <= 0 || amountTo <= 0) {
+      addLog(`Invalid pool amounts for ${fromDenom} ➯ ${toDenom}`, "error");
+      throw new Error("Invalid pool amounts");
     }
 
-    let beliefPrice;
-    if (toDenom === DENOM_BEE || fromDenom === DENOM_BEE) {
-      beliefPrice = (zigAmount / tokenAmount).toFixed(18);
-    } else {
-      beliefPrice = (tokenAmount / zigAmount).toFixed(18);
-    }
+    const beliefPrice = (amountFrom / amountTo).toFixed(18);
+    addLog(`Calculated belief_price for ${fromDenom} ➯ ${toDenom}: ${beliefPrice}`, "debug");
     return beliefPrice;
   } catch (error) {
     addLog(`Failed to calculate belief price for ${fromDenom} ➯ ${toDenom}: ${error.message}`, "error");
-    if (toDenom === DENOM_BEE || fromDenom === DENOM_BEE) return "599.5204";
-    if (toDenom === DENOM_ORO) return "1.076507379458086167";
-    if (fromDenom === DENOM_ORO) return (1 / 1.076507379458086167).toFixed(18);
-    return "1.0";
+    throw error;
   }
 }
 
